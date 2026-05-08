@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: [...safeHistory, { role: "user", parts: userParts }],
       config: {
         systemInstruction: `You are Maya, the expert AI Concierge for Instant Menu Pictures.
