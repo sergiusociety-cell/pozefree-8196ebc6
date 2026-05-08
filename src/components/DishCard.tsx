@@ -171,12 +171,13 @@ const DishCard: React.FC<DishCardProps> = ({ dish, userCredits, currentStyle, cu
       onUpdate(dish.id, { imageUrl, isLoading: false });
     } catch (err: any) {
       let errorMsg = err?.message || "Generation failed.";
+      console.error("[DishCard] generate failed:", err);
       if (errorMsg.includes("429")) {
         errorMsg = "QUOTA RESTRICTION: Paid Billing Required.";
         if (onKeyError) onKeyError();
       }
       onUpdate(dish.id, { isLoading: false, error: errorMsg });
-      addToast('error', 'Technical Error', 'Edit failed due to server error. Your credit was NOT deducted.');
+      addToast('error', 'Image generation failed', errorMsg);
     }
   };
 
@@ -193,8 +194,10 @@ const DishCard: React.FC<DishCardProps> = ({ dish, userCredits, currentStyle, cu
       setIsEditMode(false);
       if (!customPrompt) setEditPrompt('');
     } catch (err: any) {
-      onUpdate(dish.id, { isEditing: false, error: "Edit failed." });
-      addToast('error', 'Technical Error', 'Edit failed due to server error. Your credit was NOT deducted.');
+      const errorMsg = err?.message || "Edit failed.";
+      console.error("[DishCard] edit failed:", err);
+      onUpdate(dish.id, { isEditing: false, error: errorMsg });
+      addToast('error', 'Magic Edit failed', errorMsg);
     }
   };
 

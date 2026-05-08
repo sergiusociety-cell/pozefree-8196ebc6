@@ -212,31 +212,54 @@ Deno.serve(async (req) => {
       }
 
       let imageUrl: string | null = null;
-      let providerError: string | null = null;
+      let geminiError: string | null = null;
+      let kieError: string | null = null;
+      let provider: string | null = null;
 
       if (GEMINI_API_KEY) {
+        const t0 = Date.now();
+        console.log("[generate] trying Gemini (nano-banana)…");
         try {
           imageUrl = await tryGeminiGenerate(prompt);
+          provider = "gemini";
+          console.log(`[generate] ✅ Gemini success in ${Date.now() - t0}ms`);
         } catch (e) {
-          providerError = e instanceof Error ? e.message : String(e);
-          console.warn("Gemini generate failed, will try kie.ai fallback:", providerError);
+          geminiError = e instanceof Error ? e.message : String(e);
+          console.warn(`[generate] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
         }
+      } else {
+        geminiError = "GEMINI_API_KEY not configured";
       }
 
       if (!imageUrl && KIE_AI_API_KEY) {
+        const t0 = Date.now();
+        console.log("[generate] trying kie.ai (nano-banana-pro) fallback…");
         try {
           imageUrl = await kieGenerate(KIE_AI_API_KEY, prompt, safeAspectRatio);
+          provider = "kie.ai";
+          console.log(`[generate] ✅ kie.ai success in ${Date.now() - t0}ms`);
         } catch (e) {
-          providerError = e instanceof Error ? e.message : String(e);
-          console.error("kie.ai generate failed:", providerError);
+          kieError = e instanceof Error ? e.message : String(e);
+          console.error(`[generate] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
         }
+      } else if (!imageUrl) {
+        kieError = "KIE_AI_API_KEY not configured";
       }
 
       if (!imageUrl) {
-        return new Response(JSON.stringify({ error: providerError || "Image generation failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const detail = `Gemini: ${geminiError || "skipped"} | kie.ai: ${kieError || "skipped"}`;
+        console.error(`[generate] ❌ Both providers failed → ${detail}`);
+        return new Response(
+          JSON.stringify({
+            error: `Both image providers failed. ${detail}`,
+            geminiError,
+            kieError,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
-      return new Response(JSON.stringify({ imageUrl, text: "" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ imageUrl, provider, text: "" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "edit") {
@@ -258,31 +281,54 @@ Deno.serve(async (req) => {
       const dataUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${base64Data}`;
 
       let imageUrl: string | null = null;
-      let providerError: string | null = null;
+      let geminiError: string | null = null;
+      let kieError: string | null = null;
+      let provider: string | null = null;
 
       if (GEMINI_API_KEY) {
+        const t0 = Date.now();
+        console.log("[edit] trying Gemini (nano-banana)…");
         try {
           imageUrl = await tryGeminiEdit(editPrompt, base64Data, mimeType);
+          provider = "gemini";
+          console.log(`[edit] ✅ Gemini success in ${Date.now() - t0}ms`);
         } catch (e) {
-          providerError = e instanceof Error ? e.message : String(e);
-          console.warn("Gemini edit failed, will try kie.ai fallback:", providerError);
+          geminiError = e instanceof Error ? e.message : String(e);
+          console.warn(`[edit] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
         }
+      } else {
+        geminiError = "GEMINI_API_KEY not configured";
       }
 
       if (!imageUrl && KIE_AI_API_KEY) {
+        const t0 = Date.now();
+        console.log("[edit] trying kie.ai (nano-banana-pro) fallback…");
         try {
           imageUrl = await kieGenerate(KIE_AI_API_KEY, editPrompt, safeAspectRatio, [dataUrl]);
+          provider = "kie.ai";
+          console.log(`[edit] ✅ kie.ai success in ${Date.now() - t0}ms`);
         } catch (e) {
-          providerError = e instanceof Error ? e.message : String(e);
-          console.error("kie.ai edit failed:", providerError);
+          kieError = e instanceof Error ? e.message : String(e);
+          console.error(`[edit] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
         }
+      } else if (!imageUrl) {
+        kieError = "KIE_AI_API_KEY not configured";
       }
 
       if (!imageUrl) {
-        return new Response(JSON.stringify({ error: providerError || "Edit failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const detail = `Gemini: ${geminiError || "skipped"} | kie.ai: ${kieError || "skipped"}`;
+        console.error(`[edit] ❌ Both providers failed → ${detail}`);
+        return new Response(
+          JSON.stringify({
+            error: `Both image providers failed. ${detail}`,
+            geminiError,
+            kieError,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
-      return new Response(JSON.stringify({ imageUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ imageUrl, provider }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
