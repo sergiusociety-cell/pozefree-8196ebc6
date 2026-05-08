@@ -92,33 +92,61 @@ Deno.serve(async (req) => {
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Parse menu items into structural high-end data. Return JSON with a "dishes" array where each item has "name" and "description" fields: ${text}`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            dishes: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  description: { type: Type.STRING },
+    const geminiResp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [{ text: `Parse menu items into structured JSON. Return ONLY a JSON object with a "dishes" array where each item has "name" and "description" string fields. Menu:\n${text}` }],
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                dishes: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      name: { type: "STRING" },
+                      description: { type: "STRING" },
+                    },
+                    required: ["name", "description"],
+                  },
                 },
-                required: ["name", "description"],
               },
+              required: ["dishes"],
             },
           },
-        },
-      },
-    });
+        }),
+      }
+    );
 
-    const parsed = JSON.parse(response.text || '{"dishes":[]}');
+    if (!geminiResp.ok) {
+      const errBody = await geminiResp.text();
+      console.error("Gemini API error:", geminiResp.status, errBody);
+      return new Response(
+        JSON.stringify({ error: `Gemini API ${geminiResp.status}: ${errBody.slice(0, 300)}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const geminiData = await geminiResp.json();
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"dishes":[]}';
+    let parsed: { dishes: Array<{ name: string; description: string }> };
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (e) {
+      console.error("JSON parse failed. Raw text:", rawText);
+      return new Response(
+        JSON.stringify({ error: "Gemini returned non-JSON response" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify(parsed),
