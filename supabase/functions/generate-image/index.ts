@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
         const t0 = Date.now();
         console.log("[generate] trying Gemini (nano-banana)…");
         try {
-          imageUrl = await tryGeminiGenerate(prompt);
+          imageUrl = await tryGeminiGenerate(sanitizePrompt(prompt));
           provider = "gemini";
           console.log(`[generate] ✅ Gemini success in ${Date.now() - t0}ms`);
         } catch (e) {
@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
         const t0 = Date.now();
         console.log("[generate] trying kie.ai (nano-banana-pro) fallback…");
         try {
-          imageUrl = await kieGenerate(KIE_AI_API_KEY, prompt, safeAspectRatio);
+          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(prompt), safeAspectRatio);
           provider = "kie.ai";
           console.log(`[generate] ✅ kie.ai success in ${Date.now() - t0}ms`);
         } catch (e) {
@@ -312,7 +312,7 @@ Deno.serve(async (req) => {
         const t0 = Date.now();
         console.log("[edit] trying Gemini (nano-banana)…");
         try {
-          imageUrl = await tryGeminiEdit(editPrompt, base64Data, mimeType);
+          imageUrl = await tryGeminiEdit(sanitizePrompt(editPrompt), base64Data, mimeType);
           provider = "gemini";
           console.log(`[edit] ✅ Gemini success in ${Date.now() - t0}ms`);
         } catch (e) {
@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
         const t0 = Date.now();
         console.log("[edit] trying kie.ai (nano-banana-pro) fallback…");
         try {
-          imageUrl = await kieGenerate(KIE_AI_API_KEY, editPrompt, safeAspectRatio, [dataUrl]);
+          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(editPrompt), safeAspectRatio, [dataUrl]);
           provider = "kie.ai";
           console.log(`[edit] ✅ kie.ai success in ${Date.now() - t0}ms`);
         } catch (e) {
