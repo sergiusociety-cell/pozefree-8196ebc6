@@ -140,7 +140,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action, prompt, aspectRatio, imageBase64, editPrompt } = body;
+    const { action, prompt, aspectRatio, imageBase64, editPrompt, referenceImages } = body;
+    const refImages: string[] = Array.isArray(referenceImages)
+      ? (referenceImages as unknown[])
+          .filter((s) => typeof s === "string" && (s as string).length > 0 && (s as string).length < MAX_IMAGE_BASE64_LENGTH)
+          .slice(0, 4)
+          .map((s) => {
+            const str = s as string;
+            return str.startsWith("data:") ? str : `data:image/png;base64,${str}`;
+          })
+      : [];
 
     if (!action || typeof action !== "string" || !VALID_ACTIONS.includes(action as any)) {
       return new Response(
