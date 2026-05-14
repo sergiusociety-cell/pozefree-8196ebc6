@@ -218,8 +218,19 @@ Deno.serve(async (req) => {
       return url;
     };
 
-    const tryGeminiGenerate = async (p: string): Promise<string> => {
-      return await callLovableGateway([{ role: "user", content: p }]);
+    const tryGeminiGenerate = async (p: string, refs: string[] = []): Promise<string> => {
+      if (refs.length === 0) {
+        return await callLovableGateway([{ role: "user", content: p }]);
+      }
+      return await callLovableGateway([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: p },
+            ...refs.map((url) => ({ type: "image_url", image_url: { url } })),
+          ],
+        },
+      ]);
     };
 
     const tryGeminiEdit = async (p: string, b64: string, mt: string): Promise<string> => {
