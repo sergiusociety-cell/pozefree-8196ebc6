@@ -8,6 +8,44 @@ const corsHeaders = {
 
 const MAX_TEXT_LENGTH = 50000;
 
+const repairJsonText = (value: string) => value
+  .replace(/```json\s*/gi, "")
+  .replace(/```/g, "")
+  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+  .trim();
+
+const extractJsonFromResponse = (response: string) => {
+  let cleaned = repairJsonText(response);
+  const start = cleaned.search(/[\{\[]/);
+  if (start === -1) throw new Error("No JSON found in model response");
+
+  const closingChar = cleaned[start] === "[" ? "]" : "}";
+  const end = cleaned.lastIndexOf(closingChar);
+  if (end === -1 || end <= start) throw new Error("Incomplete JSON returned by model");
+
+  cleaned = cleaned.slice(start, end + 1)
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]");
+
+  return JSON.parse(cleaned);
+};
+
+const fallbackParseMenu = (text: string) => {
+  const dishes = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [namePart, ...descriptionParts] = line.split(/[:\-–—]/);
+      const name = namePart?.trim();
+      const description = descriptionParts.join(" - ").trim();
+      return name ? { name, description: description || line.trim() } : null;
+    })
+    .filter((dish): dish is { name: string; description: string } => Boolean(dish?.name));
+
+  return { dishes };
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -136,15 +174,32 @@ Deno.serve(async (req) => {
     }
 
     const geminiData = await geminiResp.json();
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"dishes":[]}';
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || '{"dishes":[]}';
     let parsed: { dishes: Array<{ name: string; description: string }> };
     try {
-      parsed = JSON.parse(rawText);
+      const extracted = extractJsonFromResponse(rawText) as { dishes?: Array<{ name?: unknown; description?: unknown }> } | Array<{ name?: unknown; description?: unknown }>;
+      const dishes = Array.isArray(extracted) ? extracted : extracted.dishes;
+      parsed = {
+        dishes: (dishes || [])
+          .map((dish) => ({
+            name: String(dish.name || "").trim(),
+            description: String(dish.description || "").trim(),
+          }))
+          .filter((dish) => dish.name.length > 0),
+      };
     } catch (e) {
       console.error("JSON parse failed. Raw text:", rawText);
+      parsed = fallbackParseMenu(text);
+    }
+
+    if (!parsed.dishes.length) {
+      parsed = fallbackParseMenu(text);
+    }
+
+    if (!parsed.dishes.length) {
       return new Response(
-        JSON.stringify({ error: "Gemini returned non-JSON response" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "No menu items found. Use one item per line, for example: Dish name: description." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
