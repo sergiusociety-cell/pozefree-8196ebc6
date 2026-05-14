@@ -1,5 +1,4 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { GoogleGenAI } from "npm:@google/genai";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -154,53 +153,56 @@ Deno.serve(async (req) => {
       ? aspectRatio
       : "1:1";
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const KIE_AI_API_KEY = Deno.env.get("KIE_AI_API_KEY");
 
-    if (!GEMINI_API_KEY && !KIE_AI_API_KEY) {
+    if (!LOVABLE_API_KEY && !KIE_AI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "No image provider configured (GEMINI_API_KEY or KIE_AI_API_KEY)" }),
+        JSON.stringify({ error: "No image provider configured (LOVABLE_API_KEY or KIE_AI_API_KEY)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log(`Processing ${action} request for user ${user.id}, aspect ratio: ${safeAspectRatio}`);
 
-    const tryGeminiGenerate = async (p: string): Promise<string> => {
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp-image-generation",
-        contents: p,
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          imageConfig: { aspectRatio: safeAspectRatio },
+    const callLovableGateway = async (messages: any[]): Promise<string> => {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY!}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages,
+          modalities: ["image", "text"],
+        }),
       });
-      const parts = response.candidates?.[0]?.content?.parts;
-      const imagePart = parts?.find((x: any) => x.inlineData);
-      if (!imagePart?.inlineData) throw new Error("Gemini returned no image");
-      return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        throw new Error(`Gateway ${res.status}: ${errBody.slice(0, 300)}`);
+      }
+      const json = await res.json();
+      const url = json?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!url) throw new Error("Gateway returned no image");
+      return url;
+    };
+
+    const tryGeminiGenerate = async (p: string): Promise<string> => {
+      return await callLovableGateway([{ role: "user", content: p }]);
     };
 
     const tryGeminiEdit = async (p: string, b64: string, mt: string): Promise<string> => {
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp-image-generation",
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: p }, { inlineData: { data: b64, mimeType: mt } }],
-          },
-        ],
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          imageConfig: { aspectRatio: safeAspectRatio },
+      const dataUrl = `data:${mt};base64,${b64}`;
+      return await callLovableGateway([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: p },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
         },
-      });
-      const parts = response.candidates?.[0]?.content?.parts;
-      const imagePart = parts?.find((x: any) => x.inlineData);
-      if (!imagePart?.inlineData) throw new Error("Gemini edit returned no image");
-      return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+      ]);
     };
 
     if (action === "generate") {
