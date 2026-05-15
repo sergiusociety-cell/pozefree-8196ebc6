@@ -73,12 +73,44 @@ async function urlToDataUrl(url: string): Promise<string> {
   return `data:${ct};base64,${btoa(bin)}`;
 }
 
+async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const admin = createClient(supabaseUrl, serviceKey);
+  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) throw new Error("invalid data url");
+  const mime = m[1];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const bin = atob(m[2]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const path = `tmp/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("kie-refs").upload(path, bytes, { contentType: mime, upsert: false });
+  if (error) throw new Error(`storage upload failed: ${error.message}`);
+  const { data } = admin.storage.from("kie-refs").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function normalizeImageInputs(inputs: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const i of inputs) {
+    if (!i) continue;
+    if (i.startsWith("http://") || i.startsWith("https://")) {
+      out.push(i);
+    } else if (i.startsWith("data:")) {
+      out.push(await uploadDataUrlToStorage(i));
+    }
+  }
+  return out;
+}
+
 async function kieGenerate(apiKey: string, prompt: string, aspectRatio: string, imageInputs: string[] = []): Promise<string> {
+  const normalized = await normalizeImageInputs(imageInputs);
   const taskId = await kieCreateTask(apiKey, {
     model: "nano-banana-2",
     input: {
       prompt,
-      image_input: imageInputs,
+      image_input: normalized,
       aspect_ratio: aspectRatio,
       resolution: "1K",
       output_format: "png",
