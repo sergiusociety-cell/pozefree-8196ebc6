@@ -75,7 +75,7 @@ async function urlToDataUrl(url: string): Promise<string> {
 
 async function kieGenerate(apiKey: string, prompt: string, aspectRatio: string, imageInputs: string[] = []): Promise<string> {
   const taskId = await kieCreateTask(apiKey, {
-    model: "nano-banana-pro",
+    model: "nano-banana-2",
     input: {
       prompt,
       image_input: imageInputs,
