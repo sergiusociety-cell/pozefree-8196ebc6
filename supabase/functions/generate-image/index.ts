@@ -291,34 +291,34 @@ Deno.serve(async (req) => {
       let kieError: string | null = null;
       let provider: string | null = null;
 
-      if (KIE_AI_API_KEY) {
+      if (LOVABLE_API_KEY) {
         const t0 = Date.now();
-        console.log("[generate] trying kie.ai (nano-banana-2)…");
-        try {
-          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(prompt), safeAspectRatio, refImages);
-          provider = "kie.ai";
-          console.log(`[generate] ✅ kie.ai success in ${Date.now() - t0}ms`);
-        } catch (e) {
-          kieError = e instanceof Error ? e.message : String(e);
-          console.warn(`[generate] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
-        }
-      } else {
-        kieError = "KIE_AI_API_KEY not configured";
-      }
-
-      if (!imageUrl && LOVABLE_API_KEY) {
-        const t0 = Date.now();
-        console.log("[generate] trying Gemini fallback…");
+        console.log("[generate] trying Gemini (primary)…");
         try {
           imageUrl = await tryGeminiGenerate(sanitizePrompt(prompt), refImages);
           provider = "gemini";
           console.log(`[generate] ✅ Gemini success in ${Date.now() - t0}ms`);
         } catch (e) {
           geminiError = e instanceof Error ? e.message : String(e);
-          console.error(`[generate] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
+          console.warn(`[generate] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
+        }
+      } else {
+        geminiError = "LOVABLE_API_KEY not configured";
+      }
+
+      if (!imageUrl && KIE_AI_API_KEY) {
+        const t0 = Date.now();
+        console.log("[generate] falling back to kie.ai (nano-banana-2)…");
+        try {
+          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(prompt), safeAspectRatio, refImages);
+          provider = "kie.ai";
+          console.log(`[generate] ✅ kie.ai success in ${Date.now() - t0}ms`);
+        } catch (e) {
+          kieError = e instanceof Error ? e.message : String(e);
+          console.error(`[generate] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
         }
       } else if (!imageUrl) {
-        geminiError = "LOVABLE_API_KEY not configured";
+        kieError = "KIE_AI_API_KEY not configured";
       }
 
       if (!imageUrl) {
@@ -360,34 +360,34 @@ Deno.serve(async (req) => {
       let kieError: string | null = null;
       let provider: string | null = null;
 
-      if (KIE_AI_API_KEY) {
+      if (LOVABLE_API_KEY) {
         const t0 = Date.now();
-        console.log("[edit] trying kie.ai (nano-banana-2)…");
-        try {
-          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(editPrompt), safeAspectRatio, [dataUrl]);
-          provider = "kie.ai";
-          console.log(`[edit] ✅ kie.ai success in ${Date.now() - t0}ms`);
-        } catch (e) {
-          kieError = e instanceof Error ? e.message : String(e);
-          console.warn(`[edit] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
-        }
-      } else {
-        kieError = "KIE_AI_API_KEY not configured";
-      }
-
-      if (!imageUrl && LOVABLE_API_KEY) {
-        const t0 = Date.now();
-        console.log("[edit] trying Gemini fallback…");
+        console.log("[edit] trying Gemini (primary)…");
         try {
           imageUrl = await tryGeminiEdit(sanitizePrompt(editPrompt), base64Data, mimeType);
           provider = "gemini";
           console.log(`[edit] ✅ Gemini success in ${Date.now() - t0}ms`);
         } catch (e) {
           geminiError = e instanceof Error ? e.message : String(e);
-          console.error(`[edit] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
+          console.warn(`[edit] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
+        }
+      } else {
+        geminiError = "LOVABLE_API_KEY not configured";
+      }
+
+      if (!imageUrl && KIE_AI_API_KEY) {
+        const t0 = Date.now();
+        console.log("[edit] falling back to kie.ai (nano-banana-2)…");
+        try {
+          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(editPrompt), safeAspectRatio, [dataUrl]);
+          provider = "kie.ai";
+          console.log(`[edit] ✅ kie.ai success in ${Date.now() - t0}ms`);
+        } catch (e) {
+          kieError = e instanceof Error ? e.message : String(e);
+          console.error(`[edit] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
         }
       } else if (!imageUrl) {
-        geminiError = "LOVABLE_API_KEY not configured";
+        kieError = "KIE_AI_API_KEY not configured";
       }
 
       if (!imageUrl) {
