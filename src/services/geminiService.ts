@@ -66,9 +66,11 @@ export const generateDishImage = async (
 ): Promise<string> => {
   const referenceImages: string[] = [];
   const refLegend: string[] = [];
+  let logoIndex = 0;
   if (logoBase64) {
     referenceImages.push(logoBase64);
-    refLegend.push(`REFERENCE IMAGE #${referenceImages.length} = RESTAURANT LOGO. MICHELIN BRANDING PROTOCOL: place this exact logo, beautifully and tastefully, embroidered or printed in a single muted tone (charcoal/ivory) onto a crisp folded white linen napkin resting elegantly beside the dish. The napkin must look freshly pressed, with soft natural folds, subtle fabric texture and gentle shadow. The logo must keep its exact shape, proportions and letters — do not redraw, distort, mirror or invent text. Subtle, refined, fine-dining presentation. Never overlay the logo on the food itself.`);
+    logoIndex = referenceImages.length;
+    refLegend.push(`REFERENCE IMAGE #${logoIndex} = RESTAURANT LOGO (MANDATORY USE). You MUST integrate this exact logo into the final image — failure to include it is unacceptable. MICHELIN NAPKIN BRANDING PROTOCOL: render a crisp, freshly-pressed folded white linen napkin resting elegantly beside the plate (never under or on the food). On that napkin, place THIS EXACT logo from REFERENCE IMAGE #${logoIndex}, reproduced as a subtle single-tone embroidery or fine tone-on-tone print in muted charcoal-grey or warm ivory thread. Preserve the logo's exact shape, proportions, letters, symbols and orientation 1:1 — do NOT redraw, restyle, mirror, recolor with extra colors, translate, or invent any text. Size: roughly 25–35% of the napkin's visible area, centered on one folded panel. The napkin must have soft natural folds, visible fine linen weave, and gentle realistic shadow. Refined, understated, fine-dining presentation. Never overlay the logo on the food, plate, cutlery, or background.`);
   }
   if (locationBase64) {
     referenceImages.push(locationBase64);
@@ -79,11 +81,15 @@ export const generateDishImage = async (
     refLegend.push(`REFERENCE IMAGE #${referenceImages.length} = PLATING REFERENCE. Match this plating architecture exactly.`);
   }
 
+  const logoCritical = logoBase64
+    ? `\n  [CRITICAL — LOGO ON NAPKIN]: The final image MUST contain a folded white linen napkin beside the dish, with the exact logo from REFERENCE IMAGE #${logoIndex} subtly embroidered onto it in a single muted tone. This is non-negotiable.`
+    : "";
+
   const masterPrompt = `[MICHELIN PRODUCTION PROTOCOL] - ${dishName.toUpperCase()}
   MANDATE: Create a 100% photorealistic commercial asset.
   STYLE: ${style}
   CONTEXT: ${dishDescription}
-  COMPOSITION: Perfectly level horizon, 30% negative space, cinematic bokeh.
+  COMPOSITION: Perfectly level horizon, 30% negative space, cinematic bokeh.${logoCritical}
   ${refLegend.join("\n  ")}`;
 
   const { imageUrl } = await callEdgeFunction("generate-image", {
