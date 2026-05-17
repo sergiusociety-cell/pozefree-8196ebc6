@@ -351,9 +351,33 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Image too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const mimeType = imageBase64.startsWith("data:") ? imageBase64.split(";")[0].split(":")[1] : "image/png";
-      const base64Data = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
-      const dataUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${base64Data}`;
+      // Normalize input: accept data URL, raw base64, or http(s) URL
+      let mimeType = "image/png";
+      let base64Data = "";
+      let dataUrl = "";
+      if (imageBase64.startsWith("http://") || imageBase64.startsWith("https://")) {
+        console.log("[edit] input is URL, fetching and converting to base64…");
+        const r = await fetch(imageBase64);
+        if (!r.ok) {
+          return new Response(JSON.stringify({ error: `Failed to fetch source image: ${r.status}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        mimeType = r.headers.get("content-type") || "image/png";
+        const buf = new Uint8Array(await r.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+        base64Data = btoa(bin);
+        dataUrl = `data:${mimeType};base64,${base64Data}`;
+      } else if (imageBase64.startsWith("data:")) {
+        mimeType = imageBase64.split(";")[0].split(":")[1] || "image/png";
+        base64Data = imageBase64.split(",")[1] || "";
+        dataUrl = imageBase64;
+      } else {
+        base64Data = imageBase64;
+        dataUrl = `data:${mimeType};base64,${base64Data}`;
+      }
+      if (!base64Data) {
+        return new Response(JSON.stringify({ error: "Could not extract image data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       let imageUrl: string | null = null;
       let geminiError: string | null = null;
