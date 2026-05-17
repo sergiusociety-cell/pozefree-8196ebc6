@@ -111,7 +111,7 @@ export const editDishImage = async (currentImageBase64: string, editPrompt: stri
   const { imageUrl } = await callEdgeFunction("generate-image", {
     action: "edit",
     imageBase64: currentImageBase64,
-    editPrompt: `MAGIC EDIT: ${editPrompt}. Hyper-realistic execution.`,
+    editPrompt: `Edit the provided reference image according to this instruction, keeping the original dish, composition, framing, lighting and identity intact. Apply ONLY the requested change: "${editPrompt}". Output a photorealistic edited version of the SAME image (not a new one). Hyper-realistic execution, preserve all other details.`,
   });
 
   if (!imageUrl) throw new Error("Edit failed.");
