@@ -345,55 +345,21 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Could not extract image data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      let imageUrl: string | null = null;
-      let geminiError: string | null = null;
-      let kieError: string | null = null;
-      let provider: string | null = null;
-
-      if (LOVABLE_API_KEY) {
-        const t0 = Date.now();
-        console.log("[edit] trying Gemini (primary)…");
-        try {
-          imageUrl = await tryGeminiEdit(sanitizePrompt(editPrompt), base64Data, mimeType);
-          provider = "gemini";
-          console.log(`[edit] ✅ Gemini success in ${Date.now() - t0}ms`);
-        } catch (e) {
-          geminiError = e instanceof Error ? e.message : String(e);
-          console.warn(`[edit] ❌ Gemini failed in ${Date.now() - t0}ms: ${geminiError}`);
-        }
-      } else {
-        geminiError = "LOVABLE_API_KEY not configured";
+      if (!KIE_AI_API_KEY) {
+        return new Response(JSON.stringify({ error: "KIE_AI_API_KEY not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      if (!imageUrl && KIE_AI_API_KEY) {
-        const t0 = Date.now();
-        console.log("[edit] falling back to kie.ai (nano-banana-2)…");
-        try {
-          imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(editPrompt), safeAspectRatio, [dataUrl]);
-          provider = "kie.ai";
-          console.log(`[edit] ✅ kie.ai success in ${Date.now() - t0}ms`);
-        } catch (e) {
-          kieError = e instanceof Error ? e.message : String(e);
-          console.error(`[edit] ❌ kie.ai failed in ${Date.now() - t0}ms: ${kieError}`);
-        }
-      } else if (!imageUrl) {
-        kieError = "KIE_AI_API_KEY not configured";
+      const t0 = Date.now();
+      console.log("[edit] using kie.ai (nano-banana-2)…");
+      try {
+        const imageUrl = await kieGenerate(KIE_AI_API_KEY, sanitizePrompt(editPrompt), safeAspectRatio, [dataUrl]);
+        console.log(`[edit] ✅ kie.ai success in ${Date.now() - t0}ms`);
+        return new Response(JSON.stringify({ imageUrl, provider: "kie.ai" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[edit] ❌ kie.ai failed in ${Date.now() - t0}ms: ${msg}`);
+        return new Response(JSON.stringify({ error: `kie.ai failed: ${msg}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
-      if (!imageUrl) {
-        const detail = `Gemini: ${geminiError || "skipped"} | kie.ai: ${kieError || "skipped"}`;
-        console.error(`[edit] ❌ Both providers failed → ${detail}`);
-        return new Response(
-          JSON.stringify({
-            error: `Both image providers failed. ${detail}`,
-            geminiError,
-            kieError,
-          }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      return new Response(JSON.stringify({ imageUrl, provider }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
